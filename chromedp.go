@@ -103,6 +103,19 @@ type Context struct {
 	// context, for example if a browser's temporary user data directory
 	// couldn't be deleted.
 	cancelErr error
+
+	// disableRuntimeAfterInit is set by WithoutRuntimeEvents. When true,
+	// attachTarget issues Runtime.disable once it has finished the
+	// one-shot worker-detection evaluate, so the session no longer
+	// receives Runtime events while the page runs JS. This defeats CDP
+	// detection scripts that look for Runtime.consoleAPICalled serialising
+	// an Error with a stack getter (see
+	// https://deviceandbrowserinfo.com/learning_zone/articles/detecting-headless-chrome-puppeteer-2024).
+	// Callers that set this option must NOT rely on chromedp.Evaluate or
+	// any other action that requires the executionContextCreated event
+	// stream — they should drive evaluations via Page.createIsolatedWorld
+	// plus Runtime.evaluate with an explicit contextId.
+	disableRuntimeAfterInit bool
 }
 
 // NewContext creates a chromedp context from the parent context. The parent
@@ -451,6 +464,16 @@ func (c *Context) attachTarget(ctx context.Context, targetID target.ID) error {
 	}
 	c.Target.isWorker = strings.Contains(res.ClassName, "WorkerGlobalScope")
 
+	// Opt-in CDP stealth: drop the Runtime domain once the one-shot worker
+	// classification above has returned, so page JS running after
+	// attachTarget no longer sees Runtime events (which serialise thrown
+	// Errors and leak automation via stack-getter probes).
+	if c.disableRuntimeAfterInit {
+		if err := runtime.Disable().Do(cdp.WithExecutor(ctx, c.Target)); err != nil {
+			return err
+		}
+	}
+
 	// Enable available domains and discover targets.
 	actions := []Action{
 		log.Enable(),
@@ -484,6 +507,26 @@ type ContextOption = func(*Context)
 // of creating a new one.
 func WithTargetID(id target.ID) ContextOption {
 	return func(c *Context) { c.targetID = id }
+}
+
+// WithoutRuntimeEvents tells attachTarget to issue Runtime.disable once the
+// target has been classified (page vs. worker), so the session no longer
+// receives Runtime events while the page runs JS. This defeats the common
+// CDP fingerprint where a page defines a getter on Error.prototype.stack and
+// logs an Error via console.* — Runtime.consoleAPICalled triggers serialisation
+// and the getter fires, revealing that a Chrome DevTools Protocol client is
+// attached.
+//
+// Constraints:
+//   - chromedp.Evaluate and other actions that rely on the internal
+//     executionContextCreated event stream will fail on contexts created with
+//     this option. Use Page.createIsolatedWorld plus Runtime.evaluate with an
+//     explicit contextId instead.
+//   - The option has no effect on sessions opened for worker targets via
+//     WithTargetID — callers wanting to disable Runtime there should send
+//     Runtime.disable explicitly before Runtime.runIfWaitingForDebugger.
+func WithoutRuntimeEvents() ContextOption {
+	return func(c *Context) { c.disableRuntimeAfterInit = true }
 }
 
 // CreateBrowserContextOption is a BrowserContext creation options.
