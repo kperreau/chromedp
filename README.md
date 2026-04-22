@@ -1,5 +1,15 @@
 # About chromedp
 
+## About this fork
+
+This repository is a **fork** of the upstream [chromedp](https://github.com/chromedp/chromedp) project. The goal is to **reduce bot fingerprinting** when driving Chrome over the Chrome DevTools Protocol, using practical guidance that aligns with the signals and checks described on [Device and browser info — *Are you a bot?*](https://deviceandbrowserinfo.com/are_you_a_bot).
+
+In particular, this fork targets mitigation of **`isAutomatedWithCDP`**: detection of CDP-driven automation in the **main JavaScript execution context** (as documented on that page: *“True if Chrome DevTools Protocol (CDP) automation is detected (main JavaScript execution context).”*). The changes here follow the same kind of best practices that site uses to reason about automation signals—not as a guarantee against all detection, but to avoid unnecessary CDP-related leaks in typical browsing scenarios.
+
+The sections below still describe the upstream `chromedp` library; refer to the commit history and package docs for fork-specific behavior.
+
+---
+
 Package `chromedp` is a faster, simpler way to drive browsers supporting the
 [Chrome DevTools Protocol][devtools-protocol] in Go without external dependencies.
 
@@ -76,6 +86,7 @@ to find out of the box.
 * [`github.com/chromedp/cdproto`][goref-cdproto] - Go reference for the generated Chrome DevTools Protocol API
 * [`github.com/chromedp/pdlgen`][chromedp-pdlgen] - tool used to generate `cdproto`
 * [`github.com/chromedp/chromedp-proxy`][chromedp-proxy] - a simple CDP proxy for logging CDP clients and browsers
+* [Are you a bot? (fingerprinting test)][deviceandbrowserinfo-bot] - reference for automation/CDP-related signals, including `isAutomatedWithCDP`
 
 [chromedp-ci]: https://github.com/chromedp/chromedp/actions/workflows/test.yml (Test CI)
 [chromedp-ci-status]: https://github.com/chromedp/chromedp/actions/workflows/test.yml/badge.svg (Test CI)
@@ -92,3 +103,4 @@ to find out of the box.
 [goref-chromedp-status]: https://pkg.go.dev/badge/github.com/chromedp/chromedp.svg
 [release-status]: https://img.shields.io/github/v/release/chromedp/chromedp?display_name=tag&sort=semver (Latest Release)
 [releases]: https://github.com/chromedp/chromedp/releases (Releases)
+[deviceandbrowserinfo-bot]: https://deviceandbrowserinfo.com/are_you_a_bot
